@@ -1,0 +1,14 @@
+PocketGPSTools - projet pour fabriquer l'APK automatiquement (gratuit)
+
+1. Créez un compte gratuit sur https://github.com (bouton Sign up).
+2. Cliquez sur le "+" en haut à droite > New repository. Nom : pocketgpstools. Laissez "Private" ou "Public".
+   Cliquez Create repository.
+3. Sur la page qui s'ouvre, cliquez sur le lien "uploading an existing file".
+4. Ouvrez ce dossier décompressé sur votre PC, sélectionnez TOUT son contenu (y compris le dossier
+   .github) et glissez-le dans la page. Attendez la fin du chargement, puis cliquez "Commit changes".
+5. Cliquez sur l'onglet "Actions". La construction démarre (3 à 6 minutes). Une coche verte = terminé.
+6. Cliquez sur l'exécution (ligne "Build APK"), descendez à "Artifacts", cliquez PocketGPSTools-apk :
+   un zip se télécharge ; il contient app-debug.apk.
+7. Copiez app-debug.apk sur le Redmi, ouvrez-le, autorisez "Installer des applications inconnues".
+
+Si une croix rouge apparaît : ouvrez l'exécution, faites une capture d'écran du message rouge et envoyez-la.

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d5fd1">
+<title>PocketGPSTools</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#fff;--fg:#1b1b1b;--mut:#666;--bd:#cfd4da;--btn:#e8edf3;--pri:#1d5fd1;--on:#cfe0ff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181c;--fg:#eceff3;--mut:#9aa3ad;--bd:#39414a;--btn:#262c33;--pri:#6ea0ff;--on:#27406e}}
+:root[data-theme="dark"]{--bg:#15181c;--fg:#eceff3;--mut:#9aa3ad;--bd:#39414a;--btn:#262c33;--pri:#6ea0ff;--on:#27406e}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px system-ui,Roboto,Arial,sans-serif;display:flex;flex-direction:column;padding:6px;gap:6px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
+button,input,select,label.b{font:inherit;color:var(--fg);background:var(--btn);border:1px solid var(--bd);border-radius:8px;padding:9px 6px;text-align:center}
+input,select,textarea{background:var(--bg);color:var(--fg)}
+button.on{background:var(--on);border-color:var(--pri)}
+button.big{padding:16px;font-size:18px;background:var(--pri);color:#fff;border:0}
+label.b input{display:none}
+section{display:none;flex:1;min-height:0;flex-direction:column;gap:6px;overflow:auto}
+section.on{display:flex}
+#c{flex:1;min-height:150px;width:100%;border:1px solid var(--bd);border-radius:8px;touch-action:none}
+#hd{display:flex;gap:6px;align-items:center;font-size:14px}#hd span{flex:1}#hd button{flex:none}#tb button{padding:9px 2px;font-size:13px}
+#hint,#pr,.mut{color:var(--mut);font-size:13px;white-space:pre-line}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--bd);padding:6px 3px;text-align:right}td:first-child,th:first-child{text-align:left}
+td button{padding:2px 8px}
+textarea{width:100%;height:110px;font:12px monospace}
+#md{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:9}
+#bx{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:14px;width:min(92vw,380px);display:flex;flex-direction:column;gap:10px}
+#mt{white-space:pre-line}
+</style>
+</head>
+<body>
+<div id="hd"><span id="gs">GPS : non démarré</span><button id="bGps">📡 GPS</button><button id="bQuit">⏻ Quitter</button></div>
+<div class="row" id="tb"><button data-t="map" class="on">Carte</button><button data-t="gui">Guidage</button><button data-t="mes">Mesure</button><button data-t="lst">Points</button><button data-t="exp">Export</button><button data-t="fil">Fichiers</button></div>
+
+<section id="map" class="on">
+  <div class="row">
+    <button id="zAll">Zoom tout</button><button id="zPt">Zoom point</button><button id="bGo">🧭 Guider</button><button id="bUndo">Annuler dessin</button>
+    <label style="flex:none;display:flex;align-items:center;gap:5px"><input type="checkbox" id="alt" style="width:auto">Altitude</label>
+  </div>
+  <div class="row" id="tools">
+    <button data-k="sel" class="on">☝ Sélection</button><button data-k="line">／ Ligne</button><button data-k="arc">⌒ Courbe</button>
+    <button data-k="circ">◯ Cercle</button><button data-k="tree">🌳 Arbre</button><button data-k="lamp">💡 Lampadaire</button>
+  </div>
+  <canvas id="c"></canvas>
+  <div id="hint"></div>
+</section>
+
+<section id="mes">
+  <div class="row"><label>N° de départ<input id="num" style="width:100%"></label><label>Nombre de mesures<input id="nm" inputmode="numeric" style="width:100%"></label></div>
+  <button class="big" id="bMes">📍 Mesurer ce point</button>
+  <button id="bStop">Annuler la mesure</button>
+  <div id="pr">Placez-vous sur le point, puis touchez « Mesurer ». Le GPS fait N mesures successives (≈ 1 par seconde) et en calcule la moyenne.</div>
+  <div class="mut">X = longitude, Y = latitude (degrés), Z = altitude GPS (approximative). Après chaque enregistrement, le numéro suivant est proposé automatiquement et vous le confirmez à la mesure suivante.</div>
+</section>
+
+<section id="lst">
+  <div class="row"><span id="cnt" class="mut"></span><button id="bAll" style="flex:none">Tout effacer</button></div>
+  <table id="tbl"></table>
+</section>
+
+<section id="exp">
+  <label>Format du fichier TXT
+    <select id="fmt" style="width:100%"><option value="0">N ; X ; Y ; Z</option><option value="1">N , X , Y , Z</option><option value="2">Topo6tem : N:X=…,Y=…,Z=…,C=NUL</option></select></label>
+  <div class="row"><button id="eTxt">Exporter TXT</button><button id="eKml">Google Earth (KML)</button><button id="eDxf">DXF (Lambert 93)</button></div>
+  <div class="row"><button id="bShare">📤 Partager (fichier)</button><button id="bShareT">📝 Partager (texte)</button></div>
+  <label class="b">Importer un fichier TXT<input type="file" id="imp"></label>
+  <div class="mut">Les fichiers sont téléchargés ; si le téléchargement est bloqué, copiez le texte ci-dessous et collez-le dans un fichier.</div>
+  <textarea id="out" readonly></textarea><button id="bCopy">Copier le texte</button>
+  <div class="mut" id="msg"></div>
+</section>
+
+<section id="gui">
+  <div class="row"><label>Origine<select id="go" style="width:100%"></select></label><label>Point à atteindre<select id="gd" style="width:100%"></select></label></div>
+  <div class="row"><label>Seuil d’arrivée (m)<input id="gt" value="1" inputmode="decimal" style="width:100%"></label><button id="gSw">⇄ Inverser</button></div>
+  <canvas id="ga" width="160" height="160" style="align-self:center;width:160px;height:160px"></canvas>
+  <div id="gref" class="mut" style="text-align:center"></div>
+  <div id="gout" style="white-space:pre-line;font:15px monospace"></div>
+  <div class="mut">Avec l’origine « Position GPS », les deltas se mettent à jour en marchant (nécessite des points en longitude/latitude). La flèche suit votre direction de marche dès que vous avancez ; à l’arrêt, le haut de l’écran est le Nord.</div>
+</section>
+<section id="fil">
+  <div id="cf" class="mut"></div>
+  <button id="fNew">➕ Nouveau fichier</button>
+  <table id="ft"></table>
+  <div class="mut">« Lire » ouvre le fichier sur la carte. Les fichiers sont conservés dans l’application ; pour les sortir du téléphone, utilisez Export ou Partager.</div>
+</section>
+<div id="qt" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center"><div style="font-size:20px">PocketGPSTools est arrêté</div><div class="mut">Le GPS est coupé et vos fichiers sont enregistrés.
+Pour fermer complètement l’application : geste ou bouton Retour/Accueil d’Android, ou balayez-la dans la liste des applications récentes.</div><button id="qBack" class="big">Reprendre</button></div>
+<div id="md"><div id="bx"><div id="mt"></div><input id="mi"><div class="row"><button id="mno">Annuler</button><button id="mok" class="on">OK</button></div></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const RED='#e02020',BLUE='#2f6bff',GREEN='#1fa51f';
+let D={pts:[],shapes:[],alt:true,n:5,fmt:2,num:'1',cur:'Fichier 1',tr:2.4,lp:0.5};
+let F={};
+let G={o:'gps',d:'',thr:1},arr=false;
+let _mk=-1,_mv=false,needFit=false,lastF=null;
+try{const o=JSON.parse(localStorage.getItem('pgt')||'{}');Object.assign(D,o);F=JSON.parse(localStorage.getItem('pgt_f')||'{}');
+ if(!Object.keys(F).length&&o.pts)F[D.cur]={pts:o.pts,shapes:o.shapes||[],mod:Date.now()};
+ const k=F[D.cur]?D.cur:Object.keys(F)[0];if(k){D.cur=k;D.pts=F[k].pts;D.shapes=F[k].shapes||[]}else{D.pts=[];D.shapes=[]}}catch(e){}
+const store=k=>{_mk=-1;F[D.cur]={pts:D.pts,shapes:D.shapes,mod:(k&&F[D.cur])?F[D.cur].mod:Date.now()};
+ try{localStorage.setItem('pgt',JSON.stringify({alt:D.alt,n:D.n,fmt:D.fmt,num:D.num,cur:D.cur,tr:D.tr,lp:D.lp}));localStorage.setItem('pgt_f',JSON.stringify(F))}catch(e){}};
+const P=id=>D.pts.find(p=>p.id===id);
+let sel=null,tool='sel',tmp=[],last=null,watch=null,acq=null;
+
+// ---------- plan métrique local (équirectangulaire autour du 1er point) ----------
+const org=()=>D.pts[0]||{x:0,y:0};
+const KX=()=>111320*Math.cos(org().y*Math.PI/180);
+const isMet=()=>{if(_mk!==D.pts.length){_mk=D.pts.length;_mv=D.pts.some(p=>Math.abs(p.x)>180||Math.abs(p.y)>90)}return _mv};
+const M=p=>isMet()?[p.x,p.y]:[(p.x-org().x)*KX(),(p.y-org().y)*110540];
+const toDeg=m=>[org().x+m[0]/KX(),org().y+m[1]/110540];
+
+// ---------- géométrie des dessins ----------
+const nrm=a=>((a%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+function circ(c,r,n=48){const o=[];for(let i=0;i<n;i++){const a=2*Math.PI*i/n;o.push([c[0]+r*Math.cos(a),c[1]+r*Math.sin(a)])}return o}
+function arcPts(q){const[A,B,C]=q,d=2*(A[0]*(B[1]-C[1])+B[0]*(C[1]-A[1])+C[0]*(A[1]-B[1]));
+ if(Math.abs(d)<1e-9)return q;
+ const s=p=>p[0]*p[0]+p[1]*p[1],ux=(s(A)*(B[1]-C[1])+s(B)*(C[1]-A[1])+s(C)*(A[1]-B[1]))/d,uy=(s(A)*(C[0]-B[0])+s(B)*(A[0]-C[0])+s(C)*(B[0]-A[0]))/d;
+ const R=Math.hypot(A[0]-ux,A[1]-uy),an=p=>Math.atan2(p[1]-uy,p[0]-ux),a0=an(A),d1=nrm(an(B)-a0),d2=nrm(an(C)-a0),tot=d1<d2?d2:d2-2*Math.PI,o=[];
+ for(let i=0;i<=32;i++){const a=a0+tot*i/32;o.push([ux+R*Math.cos(a),uy+R*Math.sin(a)])}return o}
+function polys(s){const g=(...ids)=>{const a=ids.map(P);return a.every(Boolean)?a.map(M):null};
+ if(s.t==='line'){const q=g(s.a,s.b);return q?[{p:q,k:'LIGNES'}]:[]}
+ if(s.t==='arc'){const q=g(s.a,s.b,s.c);return q?[{p:arcPts(q),k:'COURBES'}]:[]}
+ if(s.t==='circ'){const q=g(s.c);return q?[{p:circ(q[0],s.r),k:'CERCLES',z:1}]:[]}
+ if(s.t==='tree'){const q=g(s.p);if(!q)return[];const[x,y]=q[0],r=s.r||1.2;return[{p:circ([x,y],r,24),k:'ARBRES',z:1},{p:[[x,y-r],[x,y-1.8*r]],k:'ARBRES'}]}
+ if(s.t==='lamp'){const q=g(s.p);if(!q)return[];const[x,y]=q[0],r=s.r||.25,o=[{p:circ([x,y],r,16),k:'LAMPADAIRES',z:1}];
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;o.push({p:[[x+1.8*r*Math.cos(a),y+1.8*r*Math.sin(a)],[x+3.6*r*Math.cos(a),y+3.6*r*Math.sin(a)]],k:'LAMPADAIRES'})}return o}
+ return[]}
+
+// ---------- fenêtre modale (remplace prompt/confirm) ----------
+function ask(t,v,inp=true,ok='OK'){return new Promise(res=>{$('mt').textContent=t;const i=$('mi');i.style.display=inp?'block':'none';i.value=v??'';
+ $('md').style.display='flex';if(inp)i.focus();$('mok').textContent=ok;
+ $('mok').onclick=()=>{$('md').style.display='none';res(inp?i.value:true)};$('mno').onclick=()=>{$('md').style.display='none';res(null)}})}
+
+// ---------- carte ----------
+const cv=$('c'),cx=cv.getContext('2d');let vx=0,vy=0,sc=5,dpr=1;
+function size(){dpr=devicePixelRatio||1;cv.width=cv.clientWidth*dpr;cv.height=cv.clientHeight*dpr;if(needFit&&cv.clientWidth){needFit=false;fitAll();return}draw()}
+addEventListener('resize',size);
+function fitAll(){if(!D.pts.length){draw();return}const m=D.pts.map(M),xs=m.map(a=>a[0]),ys=m.map(a=>a[1]),a=Math.min(...xs),b=Math.max(...xs),c=Math.min(...ys),d=Math.max(...ys);
+ vx=(a+b)/2;vy=(c+d)/2;sc=Math.min((cv.clientWidth-70)/Math.max(b-a,2),(cv.clientHeight-70)/Math.max(d-c,2));draw()}
+function zoomPt(){const p=P(sel);if(!p){hint('Sélectionnez d’abord un point.');return}const m=M(p);vx=m[0];vy=m[1];sc=12;draw()}
+const SX=x=>cv.clientWidth/2+(x-vx)*sc,SY=y=>cv.clientHeight/2-(y-vy)*sc;
+function draw(){const W=cv.clientWidth,H=cv.clientHeight;if(!W)return;const c=cx;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+ c.strokeStyle=getComputedStyle(document.body).color;c.lineWidth=1.6;
+ for(const s of D.shapes)for(const q of polys(s)){c.beginPath();q.p.forEach((m,i)=>i?c.lineTo(SX(m[0]),SY(m[1])):c.moveTo(SX(m[0]),SY(m[1])));if(q.z)c.closePath();c.stroke()}
+ for(const p of D.pts){const m=M(p),x=SX(m[0]),y=SY(m[1]);if(x<-60||y<-60||x>W+60||y>H+60)continue;
+  c.fillStyle=RED;c.beginPath();c.arc(x,y,4.5,0,7);c.fill();
+  c.fillStyle=BLUE;c.font='bold 13px system-ui';c.fillText(p.id,x+8,y-4);
+  if(D.alt){c.fillStyle=GREEN;c.font='italic 11px system-ui';c.fillText(p.z.toFixed(1),x+8,y+11)}
+  if(p.id===sel||tmp.includes(p.id)){c.strokeStyle='#ff8c00';c.lineWidth=3;c.beginPath();c.arc(x,y,11,0,7);c.stroke();c.strokeStyle=getComputedStyle(document.body).color;c.lineWidth=1.6}}
+ if(last&&!isMet()){const g=last.coords,m=M({x:g.longitude,y:g.latitude}),x=SX(m[0]),y=SY(m[1]);c.fillStyle='rgba(29,95,209,.15)';c.beginPath();c.arc(x,y,Math.max(g.accuracy*sc,0),0,7);c.fill();c.fillStyle='#1d5fd1';c.beginPath();c.arc(x,y,5,0,7);c.fill()}
+ if(G.d){const dd=P(G.d),oo=gOrigin();if(dd&&oo){const a=M(oo),b=M(dd);c.save();c.strokeStyle='#ff8c00';c.lineWidth=2;c.setLineDash([8,6]);c.beginPath();c.moveTo(SX(a[0]),SY(a[1]));c.lineTo(SX(b[0]),SY(b[1]));c.stroke();c.restore()}}
+ c.fillStyle='#888';c.font='13px system-ui';c.fillText('N ↑',W-34,18)}
+const HINT={sel:'Touchez un point pour le sélectionner.',line:'Ligne : touchez 2 points.',arc:'Courbe : touchez 3 points (début, passage, fin).',circ:'Cercle : touchez le centre, puis saisissez le rayon.',tree:'Arbre : touchez un point.',lamp:'Lampadaire : touchez un point.'};
+const hint=t=>{$('hint').textContent=t||HINT[tool]+(tmp.length?`  (${tmp.length} choisi${tmp.length>1?'s':''})`:'')};
+const ptr=new Map();let g0=null;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,{x:e.offsetX,y:e.offsetY,x0:e.offsetX,y0:e.offsetY,t:Date.now()});g0=null});
+cv.addEventListener('pointermove',e=>{const p=ptr.get(e.pointerId);if(!p)return;
+ if(ptr.size===1){vx-=(e.offsetX-p.x)/sc;vy+=(e.offsetY-p.y)/sc;p.x=e.offsetX;p.y=e.offsetY;draw()}
+ else if(ptr.size===2){p.x=e.offsetX;p.y=e.offsetY;const[a,b]=[...ptr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(g0)sc=Math.min(Math.max(sc*d/g0,.01),1e5);g0=d;draw()}});
+cv.addEventListener('pointerup',e=>{const p=ptr.get(e.pointerId);if(p&&ptr.size===1&&Math.hypot(p.x-p.x0,p.y-p.y0)<8&&Date.now()-p.t<500)pick(p.x,p.y);ptr.delete(e.pointerId);g0=null});
+cv.addEventListener('pointercancel',e=>{ptr.delete(e.pointerId);g0=null});
+cv.addEventListener('wheel',e=>{e.preventDefault();sc*=e.deltaY<0?1.2:1/1.2;draw()},{passive:false});
+async function pick(x,y){let b=null,bd=32;for(const p of D.pts){const m=M(p),d=Math.hypot(SX(m[0])-x,SY(m[1])-y);if(d<bd){bd=d;b=p}}
+ if(!b)return;sel=b.id;
+ if(tool==='sel'){hint(`Point ${b.id} : X=${b.x.toFixed(7)}  Y=${b.y.toFixed(7)}  Z=${b.z.toFixed(1)}`);draw();return}
+ if(tool==='tree'||tool==='lamp'){D.shapes.push({t:tool,p:b.id,r:(tool==='tree'?D.tr:D.lp)/2});store();draw();return}
+ tmp.push(b.id);
+ const need={line:2,arc:3,circ:1}[tool];
+ if(tmp.length>=need){
+  if(tool==='line')D.shapes.push({t:'line',a:tmp[0],b:tmp[1]});
+  else if(tool==='arc')D.shapes.push({t:'arc',a:tmp[0],b:tmp[1],c:tmp[2]});
+  else{const r=await ask('Rayon du cercle (en mètres) :','5');const v=parseFloat(String(r).replace(',','.'));if(r!==null&&v>0)D.shapes.push({t:'circ',c:tmp[0],r:v})}
+  tmp=[];store()}
+ hint();draw()}
+$('tools').onclick=async e=>{const k=e.target.dataset.k;if(!k)return;tool=k;tmp=[];[...$('tools').children].forEach(b=>b.classList.toggle('on',b===e.target));
+ if(k==='tree'||k==='lamp'){const key=k==='tree'?'tr':'lp';
+  const r=await ask(k==='tree'?'Diamètre de la couronne de l’arbre (en mètres) :':'Diamètre du lampadaire (en mètres) :',String(D[key]),true,'OK');
+  const v=parseFloat(String(r).replace(',','.'));if(r!==null&&v>=0.05&&v<=100){D[key]=v;store(1)}
+  hint(`${k==='tree'?'Arbre':'Lampadaire'} ⌀ ${D[key]} m : touchez un point.`)}else hint();
+ draw()};
+$('zAll').onclick=fitAll;$('zPt').onclick=zoomPt;
+$('bUndo').onclick=()=>{D.shapes.pop();tmp=[];store();hint();draw()};
+$('alt').checked=D.alt;$('alt').onchange=()=>{D.alt=$('alt').checked;store(1);draw()};
+
+// ---------- onglets ----------
+function tab(n){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===n));[...$('tb').children].forEach(b=>b.classList.toggle('on',b.dataset.t===n));
+ if(n==='map')size();if(n==='lst')list();if(n==='fil')flist();if(n==='gui'){gfill();guide()}}
+$('tb').onclick=e=>{if(e.target.dataset.t)tab(e.target.dataset.t)};
+
+// ---------- GPS ----------
+function hdr(){const g=last&&last.coords;$('gs').textContent=(g?`GPS ±${g.accuracy.toFixed(0)} m`:'GPS : en attente…')+` · ${D.cur} : ${D.pts.length} pt(s)`}
+function startGps(){if(!navigator.geolocation){$('gs').textContent='GPS indisponible.';return}
+ if(watch!==null)navigator.geolocation.clearWatch(watch);
+ watch=navigator.geolocation.watchPosition(onFix,e=>{$('gs').textContent='GPS : '+(e.code===1?'permission refusée (autorisez la localisation).':e.message)},{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+ $('gs').textContent='GPS : recherche du signal…'}
+function onFix(p){last=p;hdr();draw();if($('gui').classList.contains('on'))guide();if(!acq)return;acq.s.push(p.coords);
+ $('pr').textContent=`Mesure ${acq.s.length}/${acq.n}  (±${p.coords.accuracy.toFixed(1)} m)`;if(acq.s.length>=acq.n)finish()}
+$('bGps').onclick=startGps;
+$('bMes').onclick=()=>{if(isMet()){$('pr').textContent='Les points chargés sont en coordonnées métriques : la mesure GPS (longitude/latitude) ne peut pas leur être ajoutée. Effacez-les (onglet Points) pour mesurer.';return}if(watch===null)startGps();const n=Math.max(1,parseInt($('nm').value)||1);D.n=n;$('nm').value=n;store(1);acq={n,s:[]};$('pr').textContent=`Mesure 0/${n}…`;$('bMes').disabled=true};
+$('bStop').onclick=()=>{acq=null;$('bMes').disabled=false;$('pr').textContent='Mesure annulée.'};
+async function finish(){const a=acq;acq=null;$('bMes').disabled=false;
+ const m=k=>a.s.reduce((t,c)=>t+c[k],0)/a.s.length,al=a.s.filter(c=>c.altitude!=null),z=al.length?al.reduce((t,c)=>t+c.altitude,0)/al.length:0,x=m('longitude'),y=m('latitude'),ac=m('accuracy');
+ const r=await ask(`Point à enregistrer\nX (longitude) = ${x.toFixed(8)}\nY (latitude) = ${y.toFixed(8)}\nZ (altitude) = ${z.toFixed(2)} m\nPrécision ±${ac.toFixed(1)} m — ${a.s.length} mesure(s)\n\nNuméro du point :`,D.num,true,'Enregistrer');
+ const id=(r||'').trim();if(!id){$('pr').textContent='Point non enregistré.';return}
+ const pt={id,x,y,z},i=D.pts.findIndex(p=>p.id===id);if(i>=0)D.pts[i]=pt;else D.pts.push(pt);
+ const nx=parseInt(id,10);D.num=isNaN(nx)?id:String(nx+1);$('num').value=D.num;sel=id;store();hdr();
+ $('pr').textContent=`Point ${id} enregistré${i>=0?' (remplacé)':''}. Prochain numéro proposé : ${D.num}.`}
+$('num').value=D.num;$('num').oninput=()=>{D.num=$('num').value;store(1)};$('nm').value=D.n;
+
+// ---------- liste des points ----------
+function delPt(id){D.pts=D.pts.filter(p=>p.id!==id);D.shapes=D.shapes.filter(s=>![s.a,s.b,s.c,s.p].includes(id));if(sel===id)sel=null;store();list();hdr()}
+function list(){const t=$('tbl');t.innerHTML='<tr><th>N°</th><th>X (lon)</th><th>Y (lat)</th><th>Z</th><th></th></tr>';
+ for(const p of D.pts){const r=document.createElement('tr');
+  for(const v of[p.id,p.x.toFixed(isMet()?3:7),p.y.toFixed(isMet()?3:7),p.z.toFixed(isMet()?3:1)]){const c=document.createElement('td');c.textContent=v;r.appendChild(c)}
+  const c=document.createElement('td'),b=document.createElement('button');b.textContent='🗑';
+  b.onclick=async e=>{e.stopPropagation();if(await ask(`Supprimer le point ${p.id} ?`,'',false,'Supprimer'))delPt(p.id)};c.appendChild(b);r.appendChild(c);
+  r.onclick=()=>{sel=p.id;tab('map');zoomPt()};t.appendChild(r)}
+ $('cnt').textContent=D.pts.length+' point(s)'}
+$('bAll').onclick=async()=>{if(await ask('Effacer tous les points et dessins ?','',false,'Tout effacer')){D.pts=[];D.shapes=[];sel=null;store();list();hdr();draw()}};
+
+// ---------- exports ----------
+const f8=v=>v.toFixed(isMet()?3:8),f2=v=>v.toFixed(isMet()?3:2);
+const fmtTxt=()=>D.pts.map(p=>D.fmt==0?`${p.id};${f8(p.x)};${f8(p.y)};${f2(p.z)}`:D.fmt==1?`${p.id},${f8(p.x)},${f8(p.y)},${f2(p.z)}`:`${p.id}:X=${f8(p.x)},Y=${f8(p.y)},Z=${f2(p.z)},C=NUL`).join('\r\n')+'\r\n';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function kml(){const o=['<?xml version="1.0" encoding="UTF-8"?>','<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>PocketGPSTools</name>',
+ '<Style id="p"><IconStyle><color>ff2020e0</color><scale>0.7</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle><LabelStyle><color>ffff6b2f</color></LabelStyle></Style>',
+ '<Style id="l"><LineStyle><color>ff00ffff</color><width>2</width></LineStyle></Style>'];
+ for(const p of D.pts)o.push(`<Placemark><name>${esc(p.id)}</name><description>Z = ${f2(p.z)} m</description><styleUrl>#p</styleUrl><Point><coordinates>${p.x},${p.y},${p.z}</coordinates></Point></Placemark>`);
+ for(const s of D.shapes)for(const q of polys(s)){const c=q.p.map(m=>{const d=toDeg(m);return`${d[0]},${d[1]},0`});if(q.z)c.push(c[0]);
+  o.push(`<Placemark><name>${q.k}</name><styleUrl>#l</styleUrl><LineString><tessellate>1</tessellate><coordinates>${c.join(' ')}</coordinates></LineString></Placemark>`)}
+ o.push('</Document></kml>');return o.join('\n')}
+function lcc(p0,l0,p1,p2,x0,y0){const R=Math.PI/180,a=6378137,f=1/298.257222101,e=Math.sqrt(2*f-f*f);p0*=R;l0*=R;p1*=R;p2*=R;
+ const m=p=>Math.cos(p)/Math.sqrt(1-e*e*Math.sin(p)**2),t=p=>Math.tan(Math.PI/4-p/2)/Math.pow((1-e*Math.sin(p))/(1+e*Math.sin(p)),e/2);
+ const n=(Math.log(m(p1))-Math.log(m(p2)))/(Math.log(t(p1))-Math.log(t(p2))),F=m(p1)/(n*Math.pow(t(p1),n)),r0=a*F*Math.pow(t(p0),n);
+ return(lat,lon)=>{const r=a*F*Math.pow(t(lat*R),n),th=n*(lon*R-l0);return[x0+r*Math.sin(th),y0+r0-r*Math.cos(th)]}}
+const L93=lcc(46.5,3,44,49,7e5,66e5);
+function dxf(){const o=[],g=(c,v)=>o.push(c,v),f=v=>v.toFixed(4);
+ const LAY=[['PNT',1],['NUMEROS',5],['ALTITUDES',3],['LIGNES',2],['COURBES',6],['CERCLES',4],['ARBRES',3],['LAMPADAIRES',2]];
+ g(0,'SECTION');g(2,'HEADER');g(9,'$ACADVER');g(1,'AC1009');g(0,'ENDSEC');g(0,'SECTION');g(2,'TABLES');
+ g(0,'TABLE');g(2,'LTYPE');g(70,1);g(0,'LTYPE');g(2,'CONTINUOUS');g(70,0);g(3,'Solid line');g(72,65);g(73,0);g(40,'0.0');g(0,'ENDTAB');
+ g(0,'TABLE');g(2,'LAYER');g(70,LAY.length);for(const[n,c]of LAY){g(0,'LAYER');g(2,n);g(70,0);g(62,c);g(6,'CONTINUOUS')}
+ g(0,'ENDTAB');g(0,'ENDSEC');g(0,'SECTION');g(2,'ENTITIES');
+ for(const p of D.pts){const[X,Y]=isMet()?[p.x,p.y]:L93(p.y,p.x);g(0,'POINT');g(8,'PNT');g(10,f(X));g(20,f(Y));g(30,f(p.z));
+  g(0,'TEXT');g(8,'NUMEROS');g(10,f(X+.5));g(20,f(Y+.3));g(30,'0.0');g(40,'1.0');g(1,p.id);
+  if(D.alt){g(0,'TEXT');g(8,'ALTITUDES');g(10,f(X+.5));g(20,f(Y-1.2));g(30,'0.0');g(40,'0.8');g(1,f2(p.z))}}
+ for(const s of D.shapes)for(const q of polys(s)){g(0,'POLYLINE');g(8,q.k);g(66,1);g(10,'0.0');g(20,'0.0');g(30,'0.0');g(70,q.z?1:0);
+  for(const m of q.p){const d=isMet()?null:toDeg(m),v=isMet()?m:L93(d[1],d[0]);g(0,'VERTEX');g(8,q.k);g(10,f(v[0]));g(20,f(v[1]));g(30,'0.0')}g(0,'SEQEND');g(8,q.k)}
+ g(0,'ENDSEC');g(0,'EOF');return o.join('\r\n')+'\r\n'}
+function out(name,mime,text){if(!D.pts.length){$('msg').textContent='Aucun point à exporter.';return}
+ $('out').value=text;lastF={name,text};$('msg').textContent=`${name} : enregistré dans le dossier « Téléchargements » du téléphone (appli « Fichiers »). Sinon, utilisez « Partager » ou copiez le texte ci-dessus.`;
+ if(window.Android){const r=Android.saveFile(name,mime,text);$('msg').textContent=r==='OK'?`${name} : enregistré dans Téléchargements/PocketGPSTools (appli « Fichiers »).`:'Erreur d’enregistrement : '+r;return}
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove()}catch(e){}}
+$('fmt').value=D.fmt;$('fmt').onchange=()=>{D.fmt=+$('fmt').value;store(1)};
+const fn=e=>D.cur.replace(/[^\wÀ-ÿ. ()-]/g,'_')+e;
+$('eTxt').onclick=()=>out(fn('.txt'),'text/plain',fmtTxt());
+$('eKml').onclick=()=>isMet()?($('msg').textContent='Export Google Earth impossible : les coordonnées du fichier sont métriques (pas en longitude/latitude).'):out(fn('.kml'),'application/vnd.google-earth.kml+xml',kml());
+$('eDxf').onclick=()=>out(fn('.dxf'),'application/dxf',dxf());
+$('bShare').onclick=async()=>{if(!lastF){$('msg').textContent='Exportez d’abord un fichier.';return}if(window.Android){Android.share(lastF.name,lastF.text);return}
+ try{const f=new File([lastF.text],lastF.name,{type:'text/plain'});
+  if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:lastF.name});
+  else $('msg').textContent='Partage de fichier indisponible ici : utilisez le téléchargement ou copiez le texte.'}catch(e){}};
+$('bShareT').onclick=async()=>{if(!lastF){$('msg').textContent='Exportez d’abord un fichier.';return}if(window.Android){Android.share(lastF.name,lastF.text);return}
+ try{await navigator.share({title:lastF.name,text:lastF.text})}catch(e){if(e.name!=='AbortError')$('msg').textContent='Partage impossible : utilisez le téléchargement ou « Copier le texte ».'}};
+$('bCopy').onclick=async()=>{const t=$('out').value;try{await navigator.clipboard.writeText(t);$('msg').textContent='Copié.'}catch(e){$('out').select();$('msg').textContent='Sélectionné : copiez manuellement.'}};
+
+// ---------- import TXT ----------
+const RX=/^\s*([^:]+?)\s*:\s*X\s*=\s*([^,]*?)\s*,\s*Y\s*=\s*([^,]*?)\s*(?:,\s*Z\s*=\s*([^,]*?)\s*)?(?:,\s*C\s*=\s*(.*?)\s*)?$/i;
+function parseTxt(t){const o=[];for(let l of t.split(/\r?\n/)){l=l.trim();if(!l)continue;let m=RX.exec(l),id,x,y,z;
+ if(m){id=m[1];x=parseFloat(m[2]);y=parseFloat(m[3]);z=parseFloat(m[4])}
+ else{if(/[;\t]/.test(l))l=l.replace(/,/g,'.');const c=l.split(/[;\t,\s]+/);if(c.length<3)continue;id=c[0];x=parseFloat(c[1]);y=parseFloat(c[2]);z=parseFloat(c[3])}
+ if(isNaN(x)||isNaN(y))continue;o.push({id,x,y,z:isNaN(z)?0:z})}return o}
+$('imp').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const r=new FileReader();
+ r.onload=()=>{const l=parse2(r.result);if(!l.length){$('msg').textContent='Aucun point reconnu dans ce fichier.';return}
+  store(1);let nm=fl.name.replace(/\.[^.]*$/,'')||'Import',k=nm,i=2;while(F[k])k=`${nm} (${i++})`;
+  const mp=new Map();l.forEach(p=>mp.set(p.id,p));D.cur=k;D.pts=[...mp.values()];D.shapes=[];sel=null;tmp=[];nxt();store();hdr();needFit=true;$('msg').textContent=`${l.length} point(s) importé(s)${isMet()?' (coordonnées métriques)':''} — voir l’onglet Carte.`};
+ r.readAsText(fl,'ISO-8859-1');e.target.value=''};
+const parse2=parseTxt;
+
+// ---------- guidage : origine -> point à atteindre ----------
+function gOrigin(){if(G.o==='gps'){if(!last||isMet())return null;const c=last.coords;return{x:c.longitude,y:c.latitude,z:c.altitude}}return P(G.o)||null}
+function arrow(rot,ok){const c=$('ga').getContext('2d');c.clearRect(0,0,160,160);c.save();c.translate(80,80);c.strokeStyle='#888';c.lineWidth=2;c.beginPath();c.arc(0,0,72,0,7);c.stroke();
+ c.rotate(rot*Math.PI/180);c.fillStyle=ok?'#1fa51f':'#ff8c00';c.beginPath();c.moveTo(0,-64);c.lineTo(24,10);c.lineTo(8,4);c.lineTo(8,54);c.lineTo(-8,54);c.lineTo(-8,4);c.lineTo(-24,10);c.closePath();c.fill();c.restore()}
+function guide(){const el=$('gout'),d=P(G.d),o=gOrigin();
+ if(!d){el.textContent='Choisissez le point à atteindre.';return}
+ if(!o){el.textContent=G.o==='gps'?(isMet()?'Origine GPS impossible : les points sont en coordonnées métriques.\nChoisissez un point comme origine.':'En attente du signal GPS…'):'Origine introuvable.';return}
+ const a=M(o),b=M(d),dx=b[0]-a[0],dy=b[1]-a[1],dist=Math.hypot(dx,dy);let az=Math.atan2(dx,dy)*180/Math.PI;if(az<0)az+=360;
+ const card=['N','NE','E','SE','S','SO','O','NO'][Math.round(az/45)%8],sg=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(3),sg7=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(7);
+ let ref=0,refTxt='haut de l’écran = Nord';
+ if(G.o==='gps'){const c=last.coords;if(c.heading!=null&&!isNaN(c.heading)&&(c.speed||0)>0.5){ref=c.heading;refTxt='haut de l’écran = votre direction de marche'}}
+ const rot=az-ref,rel=((rot+540)%360)-180,ok=dist<=G.thr;
+ let s=`${G.o==='gps'?'GPS':'Point '+G.o}  →  Point ${d.id}\n\nΔX (Est)  : ${sg(dx)} m\nΔY (Nord) : ${sg(dy)} m\n`;
+ if(!isMet())s+=`ΔX = ${sg7(d.x-o.x)}°   ΔY = ${sg7(d.y-o.y)}°\n`;
+ if(o.z!=null&&!isNaN(o.z))s+=`ΔZ : ${sg(d.z-o.z)} m${G.o==='gps'?' (alt. GPS approximative)':''}\n`;
+ s+=`\nDistance : ${dist.toFixed(2)} m\nGisement : ${az.toFixed(1)}° (${(az*400/360).toFixed(1)} gon) ${card}`;
+ if(ref!==0||refTxt.includes('marche'))s+=`\n${Math.abs(rel)<5?'Tout droit':Math.abs(rel)>175?'Faites demi-tour':'Tournez à '+(rel>0?'droite':'gauche')+' de '+Math.abs(rel).toFixed(0)+'°'}`;
+ if(ok){s+='\n\n✔ ARRIVÉ (≤ '+G.thr+' m)';if(!arr){arr=true;try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}}else if(dist>G.thr*2)arr=false;
+ el.textContent=s;$('gref').textContent=refTxt;arrow(rot,ok)}
+function gfill(){const so=$('go'),sd=$('gd');so.innerHTML='';sd.innerHTML='';
+ const add=(s,v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;s.appendChild(o)};
+ add(so,'gps','📡 Position GPS');for(const p of D.pts){add(so,p.id,'Point '+p.id);add(sd,p.id,'Point '+p.id)}
+ if(G.o!=='gps'&&!P(G.o))G.o='gps';if(!P(G.d))G.d=D.pts[0]?D.pts[0].id:'';so.value=G.o;sd.value=G.d}
+$('go').onchange=()=>{G.o=$('go').value;guide();draw()};$('gd').onchange=()=>{G.d=$('gd').value;guide();draw()};
+$('gt').oninput=()=>{G.thr=parseFloat($('gt').value.replace(',','.'))||1;guide()};
+$('gSw').onclick=()=>{if(G.o==='gps'){$('gout').textContent='Inverser nécessite un point comme origine.';return}const t=G.o;G.o=G.d;G.d=t;gfill();guide();draw()};
+$('bGo').onclick=()=>{if(!sel||!P(sel)){hint('Touchez d’abord un point (outil Sélection), puis « Guider ».');return}G.d=sel;tab('gui')};
+
+// ---------- gestion des fichiers ----------
+function nxt(){const mx=Math.max(0,...D.pts.map(p=>parseInt(p.id,10)||0));D.num=String(mx+1);$('num').value=D.num}
+function openF(n){store(1);D.cur=n;D.pts=F[n].pts;D.shapes=F[n].shapes||[];sel=null;tmp=[];needFit=true;nxt();store(1);hdr()}
+async function newF(){const r=await ask('Nom du nouveau fichier :','Fichier '+(Object.keys(F).length+1),true,'Créer');const n=(r||'').trim();if(!n)return;
+ if(F[n]){$('cf').textContent='Ce nom existe déjà.';return}
+ store(1);D.cur=n;D.pts=[];D.shapes=[];sel=null;tmp=[];D.num='1';$('num').value='1';needFit=true;store();hdr();flist()}
+async function delF(n){if(!await ask(`Supprimer le fichier « ${n} » et ses ${F[n].pts.length} point(s) ?`,'',false,'Supprimer'))return;
+ delete F[n];
+ if(n===D.cur){const k=Object.keys(F)[0];if(k){D.cur=k;D.pts=F[k].pts;D.shapes=F[k].shapes||[]}else{D.cur='Fichier 1';D.pts=[];D.shapes=[]}sel=null;tmp=[];needFit=true;nxt()}
+ store(1);hdr();flist()}
+function flist(){const t=$('ft');t.innerHTML='<tr><th>Fichier</th><th>Pts</th><th>Modifié</th><th></th></tr>';
+ for(const n of Object.keys(F).sort()){const f=F[n],r=document.createElement('tr'),td=()=>{const c=document.createElement('td');r.appendChild(c);return c};
+  td().textContent=(n===D.cur?'● ':'')+n;td().textContent=f.pts.length;
+  const d=f.mod?new Date(f.mod):null;td().textContent=d?d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
+  const c=td(),b1=document.createElement('button'),b2=document.createElement('button');b1.textContent='Lire';b1.onclick=()=>{openF(n);tab('map')};b2.textContent='🗑';b2.onclick=()=>delF(n);c.appendChild(b1);c.appendChild(b2);t.appendChild(r)}
+ $('cf').textContent='Fichier ouvert : '+D.cur}
+$('fNew').onclick=newF;
+$('bQuit').onclick=async()=>{if(!await ask('Quitter PocketGPSTools ?\nLe GPS sera arrêté ; vos fichiers sont enregistrés.','',false,'Quitter'))return;
+ acq=null;$('bMes').disabled=false;if(watch!==null){navigator.geolocation.clearWatch(watch);watch=null}last=null;store(1);
+ $('qt').style.display='flex';try{if(window.Android)Android.quit();else window.close()}catch(e){}};
+$('qBack').onclick=()=>{$('qt').style.display='none';startGps()};
+
+// ---------- démarrage ----------
+hdr();hint();size();startGps();fitAll();
+
+</script>
+</body>
+</html>
